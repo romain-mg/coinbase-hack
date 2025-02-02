@@ -7,6 +7,8 @@ import {
   cdpApiActionProvider,
   cdpWalletActionProvider,
   pythActionProvider,
+  customActionProvider,
+  WalletProvider,
 } from "@coinbase/agentkit";
 import { getLangChainTools } from "@coinbase/agentkit-langchain";
 import { HumanMessage } from "@langchain/core/messages";
@@ -17,9 +19,95 @@ import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as readline from "readline";
 import { fileURLToPath } from "url";
-import { dirname } from "path";
+import { z } from "zod";
+import {
+  Alchemy,
+  AssetTransfersCategory,
+  Network,
+  AssetTransfersResponse,
+  AssetTransfersResult,
+} from "alchemy-sdk";
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
 
 dotenv.config();
+
+const settings = {
+  apiKey: process.env.ALCHEMY_API_KEY,
+  network: Network.ETH_MAINNET,
+};
+const alchemy = new Alchemy(settings);
+
+interface ProcessedTransaction {
+  uniqueId: string;
+  category: AssetTransfersCategory;
+  blockNum: string;
+  from: string;
+  to: string | null;
+  value: number | null;
+  tokenId: string | null;
+  asset: string | null;
+  hash: string;
+}
+
+async function getWalletTransactions(
+  address: string
+): Promise<ProcessedTransaction[]> {
+  try {
+    const response: AssetTransfersResponse =
+      await alchemy.core.getAssetTransfers({
+        fromBlock: "0x0",
+        fromAddress: address,
+        category: [
+          AssetTransfersCategory.ERC20,
+          AssetTransfersCategory.EXTERNAL,
+        ],
+      });
+
+    const transactions: ProcessedTransaction[] = response.transfers.map(
+      (txn: AssetTransfersResult) => {
+        return {
+          uniqueId: txn.uniqueId,
+          category: txn.category,
+          blockNum: txn.blockNum,
+          from: txn.from,
+          to: txn.to,
+          value: txn.value,
+          tokenId: txn.tokenId,
+          asset: txn.asset,
+          hash: txn.hash,
+        };
+      }
+    );
+
+    return transactions;
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error("Error fetching transaction history:", error.message);
+    } else {
+      console.error("Unknown error fetching transaction history:", error);
+    }
+    throw error;
+  }
+}
+const customGetTransactionsHistory = customActionProvider<WalletProvider>({
+  name: "get_transactions_history",
+  description: "Get transactions history of a wallet",
+  schema: z.object({
+    address: z
+      .string()
+      .describe("The address to retrieve transactions history from"),
+  }),
+  invoke: async (walletProvider: any, args: any) => {
+    const { address } = args;
+    const transactions = await getWalletTransactions(address);
+    // Return an object that includes the address and transactions
+    return {
+      message: `Transactions history for address ${address}`,
+      transactions,
+    };
+  },
+});
 
 /**
  * Validates that required environment variables are set
@@ -104,6 +192,7 @@ async function initializeAgent() {
     const agentkit = await AgentKit.from({
       walletProvider,
       actionProviders: [
+        customGetTransactionsHistory,
         wethActionProvider(),
         pythActionProvider(),
         walletActionProvider(),
@@ -311,14 +400,14 @@ async function main() {
   }
 }
 
-if (import.meta.url === `file://${fileURLToPath(import.meta.url)}`) {
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
   console.log("Starting Agent...");
   main().catch((error) => {
     console.error("Fatal error:", error);
     process.exit(1);
   });
 }
-
 export async function agentChat(prompt: string): Promise<string> {
   const { agent, config } = await initializeAgent();
   let finalResponse = "";
