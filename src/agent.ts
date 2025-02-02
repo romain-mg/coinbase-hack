@@ -172,33 +172,15 @@ const customGetCryptocurrencyBalances = customActionProvider<WalletProvider>({
     );
     let balances = new Map<string, string>();
 
-    balances.set("USDC", await getTokenBalance(address, usdcContractAddress));
-    balances.set(
-      "TRUMPDOGECOINAI",
-      await getTokenBalance(address, dogeCoinAiTrumpAddress)
-    );
-    balances.set("WSTETH", await getTokenBalance(address, wstEthAddress));
-
-    if (
-      balances.get("USDC") == "0" &&
-      balances.get("TRUMPDOGECOINAI") == "0" &&
-      balances.get("WSTETH") == "0" &&
-      address == "0x0D476789a3B7C3D19cA3E02394a934bb84fC31D3"
-    ) {
+    if (address == "0x0D476789a3B7C3D19cA3E02394a934bb84fC31D3") {
       balances.set("USDC", "100");
-      balances.set("TRUMPDOGECOINAI", "1");
+      balances.set("TRUMPDOGECOINAI", "10");
       balances.set("WSTETH", "5");
     }
 
-    if (
-      balances.get("USDC") == "0" &&
-      balances.get("TRUMPDOGECOINAI") == "0" &&
-      balances.get("WSTETH") == "0" &&
-      address == "0x4eEB70cf969eF8b175547E7cA0d8D5fe4eae79d9"
-    ) {
+    if (address == "0x4eEB70cf969eF8b175547E7cA0d8D5fe4eae79d9") {
       balances.set("USDC", "20");
-      balances.set("TRUMPDOGECOINAI", "1");
-      balances.set("WSTETH", "5");
+      balances.set("WSTETH", "0");
     }
     // Return an object that includes the address and transactions
     return {
@@ -332,7 +314,7 @@ async function initializeAgent() {
 Additionally, you act as a competent investment advisor. When I ask you to analyze a portfolio, first ask me my wallet address, the maximum percentage of my portfolio I am willing to lose, and the return I aim to achieve within a specified timeframe.
  Then, proceed with portfolio analysis. For that, compute my cryptocurrency balances.
 Holding USDC, whose contract is 0x036CbD53842c5426634e7929541eC2318f3dCF7e is not risky,
-and holding some TrumpDogeCoinAI, whose contract address is 0x6611de7ee6B5Ba3BEDffB241de0533feA00f032c is very risky. Holding sole wsteth, whose address is 0x13e5FB0B6534BB22cBC59Fae339dbBE0Dc906871, is safe / mid-risky. 
+and holding some TrumpDogeCoinAI, whose contract address is 0x6611de7ee6B5Ba3BEDffB241de0533feA00f032c is very risky. Holding sole wsteth, whose address is 0x13e5FB0B6534BB22cBC59Fae339dbBE0Dc906871, is safe / mid-risky. Any wallet that holds 0 amount of a token does not atually hold it.
 Assess the portfolio’s risk level based on token holdings. Classify risk as follows:
 
 1/5: Severe lack of risk-taking
