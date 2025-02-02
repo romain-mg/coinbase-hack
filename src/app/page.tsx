@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { MotionHeader } from "@/app/components/MotionHeader"
 import { WalletStats } from './types/wallet'
 import { WalletStatsTable } from './components/WalletStatsTable'
-
 const CHAT_SUGGESTIONS = [
   "🔍 Analyze my wallet activity",
   "💰 Check my investment performance",
@@ -176,14 +175,19 @@ export default function Home() {
       {/* Response Container */}
       <div className="mt-[500px] w-full max-w-4xl mx-auto px-4 pb-8">
         {(isLoading || currentResponse || walletStats) && (
-          <div className="space-y-4">
-            <WalletStatsTable stats={walletStats} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Wallet Stats Column */}
+            <div>
+              <WalletStatsTable stats={walletStats} />
+            </div>
+            
+            {/* Response Column */}
             {(isLoading || currentResponse) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
-                className="bg-white bg-opacity-80 backdrop-blur-md rounded-lg p-6 shadow-lg"
+                className="bg-white bg-opacity-80 backdrop-blur-md rounded-lg p-6 shadow-lg h-fit"
               >
                 {isLoading ? (
                   <div className="flex items-center space-x-2">
