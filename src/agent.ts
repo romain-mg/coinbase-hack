@@ -25,9 +25,11 @@ import { AssetTransfersCategory } from "alchemy-sdk";
 import { IterableReadableStream } from "@langchain/core/utils/stream";
 import {
   usdcContractAddress,
-  iotexContractAddress,
-  trumpDogeAiContractAddress,
   wstEthAddress,
+  dogeCoinAiTrumpAddress,
+  trumpDogeAiContractAddress,
+  usdcMainnetContractAddress,
+  wstEthMainnetAddress,
 } from "./app/constants/tokenAddresses";
 
 dotenv.config();
@@ -171,25 +173,33 @@ const customGetCryptocurrencyBalances = customActionProvider<WalletProvider>({
     let balances = new Map<string, string>();
 
     balances.set("USDC", await getTokenBalance(address, usdcContractAddress));
-    balances.set("IOTEX", await getTokenBalance(address, iotexContractAddress));
     balances.set(
       "TRUMPDOGECOINAI",
-      await getTokenBalance(address, trumpDogeAiContractAddress)
+      await getTokenBalance(address, dogeCoinAiTrumpAddress)
     );
     balances.set("WSTETH", await getTokenBalance(address, wstEthAddress));
 
     if (
       balances.get("USDC") == "0" &&
-      balances.get("IOTEX") == "0" &&
       balances.get("TRUMPDOGECOINAI") == "0" &&
-      balances.get("WSTETH") == "0"
+      balances.get("WSTETH") == "0" &&
+      address == "0x0D476789a3B7C3D19cA3E02394a934bb84fC31D3"
     ) {
-      balances.set("USDC", "0");
-      balances.set("IOTEX", "0");
-      balances.set("TRUMPDOGECOINAI", "100000");
-      balances.set("WSTETH", "2");
+      balances.set("USDC", "100");
+      balances.set("TRUMPDOGECOINAI", "1");
+      balances.set("WSTETH", "5");
     }
 
+    if (
+      balances.get("USDC") == "0" &&
+      balances.get("TRUMPDOGECOINAI") == "0" &&
+      balances.get("WSTETH") == "0" &&
+      address == "0x4eEB70cf969eF8b175547E7cA0d8D5fe4eae79d9"
+    ) {
+      balances.set("USDC", "20");
+      balances.set("TRUMPDOGECOINAI", "1");
+      balances.set("WSTETH", "5");
+    }
     // Return an object that includes the address and transactions
     return {
       message: `Balances for address ${address}`,
@@ -230,7 +240,7 @@ function validateEnvironment(): void {
 
   // Warn about optional NETWORK_ID
   if (!process.env.NETWORK_ID) {
-    console.warn("Warning: NETWORK_ID not set, defaulting to base mainnet ");
+    console.warn("Warning: NETWORK_ID not set, defaulting to base sepolia ");
   }
 }
 
@@ -270,7 +280,7 @@ async function initializeAgent() {
         "\n"
       ),
       cdpWalletData: walletDataStr || undefined,
-      networkId: process.env.NETWORK_ID || "base-mainnet",
+      networkId: process.env.NETWORK_ID || "base-sepolia",
     };
 
     const walletProvider = await CdpWalletProvider.configureWithWallet(config);
@@ -319,20 +329,20 @@ async function initializeAgent() {
         return [
           new SystemMessage(`You are a knowledgeable onchain agent powered by the Coinbase Developer Platform (CDP) AgentKit. You can interact with onchain tools to execute transactions, fetch wallet data, and analyze assets. If you need funds, request the user’s wallet address and ask them to send funds. Before taking any action, retrieve wallet details to determine the active network. If you encounter a 5XX (internal) HTTP error, inform the user to try again later. If a request exceeds your current tool capabilities, state so and recommend the user implement it using the CDP SDK + AgentKit. Direct them to docs.cdp.coinbase.com for further guidance. Keep responses concise and efficient. Avoid repeating tool descriptions unless explicitly asked.
 
-Additionally, you act as a competent investment advisor. When advising on investments or analyzing a portfolio, first ask the user:
-
-The maximum percentage of their portfolio they are willing to lose.
-The return they aim to achieve within a specified timeframe.
-If the user does not provide a wallet address, prompt them once—then proceed with portfolio analysis. For that, compute the user's cryptocurrency balances.
-Holding USDC, whose contract is 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 is not risky,holding IOTEX, whose contract is 0xbcbaf311cec8a4eac0430193a528d9ff27ae38c1 is risky
-and holding some TrumpDogeCoinAI, whose contract address is 0x6611de7ee6B5Ba3BEDffB241de0533feA00f032c is really super ultra risky. Assess the portfolio’s risk level based on token holdings, price trends, and volatility. Classify risk as follows:
+Additionally, you act as a competent investment advisor. When I ask you to analyze a portfolio, first ask me my wallet address, the maximum percentage of my portfolio I am willing to lose, and the return I aim to achieve within a specified timeframe.
+ Then, proceed with portfolio analysis. For that, compute my cryptocurrency balances.
+Holding USDC, whose contract is 0x036CbD53842c5426634e7929541eC2318f3dCF7e is not risky,
+and holding some TrumpDogeCoinAI, whose contract address is 0x6611de7ee6B5Ba3BEDffB241de0533feA00f032c is very risky. Holding sole wsteth, whose address is 0x13e5FB0B6534BB22cBC59Fae339dbBE0Dc906871, is safe / mid-risky. 
+Assess the portfolio’s risk level based on token holdings. Classify risk as follows:
 
 1/5: Severe lack of risk-taking
 2/5: Lack of risk-taking
 3/5: Appropriate risk-taking
 4/5: High risk-taking
 5/5: Ultra high risk-taking
-Provide a final assessment and investment advice based on risk exposure. Your goal is to be precise, effective, and informative.`),
+Provide a final assessment  ouf of 5, and investment advice based on risk exposure. Your goal is to be precise, effective, and informative.
+If I ask you how onchain I am, compute my onchain reputation. Judge it, and then in your wallet, you have a 
+collection named OnChainDudeNFT. Mint one of this collection to represent my onchain activity and send it to my wallet address.`),
         ].concat(state.messages);
       },
     });
