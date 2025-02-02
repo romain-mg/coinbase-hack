@@ -9,9 +9,10 @@ export function MotionHeader() {
       animate={{ opacity: 1, y: 0 }}
       className="text-center mb-8"
     >
-      <h1 className="text-4xl font-bold mb-4">Coinbase Agent Chat</h1>
+      <h1 className="text-4xl font-bold mb-4">Insights.ai wallet analyzer </h1>
       <p className="text-gray-600 dark:text-gray-400">
-        Interact with the Coinbase Developer Platform AgentKit
+        Get investment advice, measure your onchain activity and get a NFT
+        representing it.
       </p>
     </motion.div>
   );
