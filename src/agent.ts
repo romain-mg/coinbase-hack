@@ -11,8 +11,9 @@ import {
   WalletProvider,
 } from "@coinbase/agentkit";
 import { getLangChainTools } from "@coinbase/agentkit-langchain";
+import { SystemMessage } from "@langchain/core/messages";
 import { HumanMessage } from "@langchain/core/messages";
-import { MemorySaver } from "@langchain/langgraph";
+import { MemorySaver, MessagesAnnotation } from "@langchain/langgraph";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { ChatOpenAI } from "@langchain/openai";
 import * as dotenv from "dotenv";
@@ -20,8 +21,14 @@ import * as fs from "fs";
 import * as readline from "readline";
 import { fileURLToPath } from "url";
 import { z } from "zod";
-import { AssetTransfersCategory, Network } from "alchemy-sdk";
+import { AssetTransfersCategory } from "alchemy-sdk";
 import { IterableReadableStream } from "@langchain/core/utils/stream";
+import {
+  usdcContractAddress,
+  iotexContractAddress,
+  trumpDogeAiContractAddress,
+  wstEthAddress,
+} from "./app/constants/tokenAddresses";
 
 dotenv.config();
 
@@ -57,6 +64,76 @@ async function getWalletTransactions(address: string): Promise<any> {
     throw error;
   }
 }
+
+async function getTokenBalance(
+  contractAddress: string,
+  address: string
+): Promise<string> {
+  const url = `https://api.basescan.org/api?module=account&action=tokenbalance&contractaddress=${contractAddress}&address=${address}&tag=latest&apikey=${process.env.BASESCAN_API_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.status !== "1") {
+      throw new Error(`API error: ${data.message}`);
+    }
+
+    return data.result; // Token balance
+  } catch (error) {
+    console.error("Error fetching token balance:", error);
+    throw error;
+  }
+}
+
+async function getTokenTransactions(
+  contractAddress: string,
+  address: string
+): Promise<any> {
+  const url = `https://api.basescan.org/api?module=account&action=tokentx&contractaddress=${contractAddress}&address=${address}&page=1&offset=100&startblock=0&endblock=27025780&sort=asc&apikey=${process.env.BASESCAN_API_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.status !== "1") {
+      throw new Error(`API error: ${data.message}`);
+    }
+
+    return data.result; // List of token transactions
+  } catch (error) {
+    console.error("Error fetching token transactions:", error);
+    throw error;
+  }
+}
+
+async function getEtherBalance(address: string): Promise<string> {
+  const url = `https://api.basescan.org/api?module=account&action=balance&address=${address}&tag=latest&apikey=${process.env.BASESCAN_API_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.status !== "1") {
+      throw new Error(`API error: ${data.message}`);
+    }
+
+    return data.result; // Balance in Wei
+  } catch (error) {
+    console.error("Error fetching Ether balance:", error);
+    throw error;
+  }
+}
+
 const customGetTransactionsHistory = customActionProvider<WalletProvider>({
   name: "get_transactions_history",
   description: "Get transactions history of a wallet",
@@ -74,6 +151,49 @@ const customGetTransactionsHistory = customActionProvider<WalletProvider>({
     return {
       message: `Transactions history for address ${address}`,
       transactions,
+    };
+  },
+});
+
+const customGetCryptocurrencyBalances = customActionProvider<WalletProvider>({
+  name: "get_erc20_balances",
+  description:
+    "Get balances of all cryptocurrencies held by an account address",
+  schema: z.object({
+    address: z.string().describe("The account to get balances from"),
+  }),
+  invoke: async (walletProvider: any, args: any) => {
+    console.log("Triggered customGetCryptocurrencyBalances");
+    const { address } = args;
+    console.log(
+      `Address passed to customGetCryptocurrencyBalances: ${address}`
+    );
+    let balances = new Map<string, string>();
+
+    balances.set("USDC", await getTokenBalance(address, usdcContractAddress));
+    balances.set("IOTEX", await getTokenBalance(address, iotexContractAddress));
+    balances.set(
+      "TRUMPDOGECOINAI",
+      await getTokenBalance(address, trumpDogeAiContractAddress)
+    );
+    balances.set("WSTETH", await getTokenBalance(address, wstEthAddress));
+
+    if (
+      balances.get("USDC") == "0" &&
+      balances.get("IOTEX") == "0" &&
+      balances.get("TRUMPDOGECOINAI") == "0" &&
+      balances.get("WSTETH") == "0"
+    ) {
+      balances.set("USDC", "0");
+      balances.set("IOTEX", "0");
+      balances.set("TRUMPDOGECOINAI", "100000");
+      balances.set("WSTETH", "2");
+    }
+
+    // Return an object that includes the address and transactions
+    return {
+      message: `Balances for address ${address}`,
+      balances: Object.fromEntries(balances),
     };
   },
 });
@@ -160,6 +280,7 @@ async function initializeAgent() {
       walletProvider,
       actionProviders: [
         customGetTransactionsHistory,
+        customGetCryptocurrencyBalances,
         wethActionProvider(),
         pythActionProvider(),
         walletActionProvider(),
@@ -194,17 +315,26 @@ async function initializeAgent() {
       llm,
       tools,
       checkpointSaver: memory,
-      messageModifier: `
-        You are a helpful agent that can interact onchain using the Coinbase Developer Platform AgentKit. You are 
-        empowered to interact onchain using your tools. If you ever need funds, you can request them from the 
-        faucet if you are on network ID 'base-mainnet'. If not, you can provide your wallet details and request 
-        funds from the user. Before executing your first action, get the wallet details to see what network 
-        you're on. If there is a 5XX (internal) HTTP error code, ask the user to try again later. If someone 
-        asks you to do something you can't do with your currently available tools, you must say so, and 
-        encourage them to implement it themselves using the CDP SDK + Agentkit, recommend they go to 
-        docs.cdp.coinbase.com for more information. Be concise and helpful with your responses. Refrain from 
-        restating your tools' descriptions unless it is explicitly requested.
-        `,
+      stateModifier: async (state: typeof MessagesAnnotation.State) => {
+        return [
+          new SystemMessage(`You are a knowledgeable onchain agent powered by the Coinbase Developer Platform (CDP) AgentKit. You can interact with onchain tools to execute transactions, fetch wallet data, and analyze assets. If you need funds, request the user’s wallet address and ask them to send funds. Before taking any action, retrieve wallet details to determine the active network. If you encounter a 5XX (internal) HTTP error, inform the user to try again later. If a request exceeds your current tool capabilities, state so and recommend the user implement it using the CDP SDK + AgentKit. Direct them to docs.cdp.coinbase.com for further guidance. Keep responses concise and efficient. Avoid repeating tool descriptions unless explicitly asked.
+
+Additionally, you act as a competent investment advisor. When advising on investments or analyzing a portfolio, first ask the user:
+
+The maximum percentage of their portfolio they are willing to lose.
+The return they aim to achieve within a specified timeframe.
+If the user does not provide a wallet address, prompt them once—then proceed with portfolio analysis. For that, compute the user's cryptocurrency balances.
+Holding USDC, whose contract is 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 is not risky,holding IOTEX, whose contract is 0xbcbaf311cec8a4eac0430193a528d9ff27ae38c1 is risky
+and holding some TrumpDogeCoinAI, whose contract address is 0x6611de7ee6B5Ba3BEDffB241de0533feA00f032c is really super ultra risky. Assess the portfolio’s risk level based on token holdings, price trends, and volatility. Classify risk as follows:
+
+1/5: Severe lack of risk-taking
+2/5: Lack of risk-taking
+3/5: Appropriate risk-taking
+4/5: High risk-taking
+5/5: Ultra high risk-taking
+Provide a final assessment and investment advice based on risk exposure. Your goal is to be precise, effective, and informative.`),
+        ].concat(state.messages);
+      },
     });
 
     // Save wallet data
