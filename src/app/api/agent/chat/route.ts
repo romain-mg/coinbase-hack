@@ -5,6 +5,7 @@ import { agentChat } from "@/agent";
 export async function POST(request: Request) {
   try {
     const { prompt } = await request.json();
+    console.log(`prompt: ${prompt}`);
     const responseText = await agentChat(prompt);
     return NextResponse.json({ response: responseText });
   } catch (error) {

@@ -20,23 +20,10 @@ import * as fs from "fs";
 import * as readline from "readline";
 import { fileURLToPath } from "url";
 import { z } from "zod";
-import {
-  Alchemy,
-  AssetTransfersCategory,
-  Network,
-  AssetTransfersResponse,
-  AssetTransfersResult,
-} from "alchemy-sdk";
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+import { AssetTransfersCategory, Network } from "alchemy-sdk";
+import { IterableReadableStream } from "@langchain/core/utils/stream";
 
 dotenv.config();
-
-const settings = {
-  apiKey: process.env.ALCHEMY_API_KEY,
-  network: Network.BASE_MAINNET,
-};
-const alchemy = new Alchemy(settings);
 
 interface ProcessedTransaction {
   uniqueId: string;
@@ -50,43 +37,23 @@ interface ProcessedTransaction {
   hash: string;
 }
 
-async function getWalletTransactions(
-  address: string
-): Promise<ProcessedTransaction[]> {
+async function getWalletTransactions(address: string): Promise<any> {
+  const url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=10&sort=asc&apikey=${process.env.BASESCAN_API_KEY}`;
+
   try {
-    const response: AssetTransfersResponse =
-      await alchemy.core.getAssetTransfers({
-        fromBlock: "0x0",
-        fromAddress: address,
-        category: [
-          AssetTransfersCategory.ERC20,
-          AssetTransfersCategory.EXTERNAL,
-        ],
-      });
-
-    const transactions: ProcessedTransaction[] = response.transfers.map(
-      (txn: AssetTransfersResult) => {
-        return {
-          uniqueId: txn.uniqueId,
-          category: txn.category,
-          blockNum: txn.blockNum,
-          from: txn.from,
-          to: txn.to,
-          value: txn.value,
-          tokenId: txn.tokenId,
-          asset: txn.asset,
-          hash: txn.hash,
-        };
-      }
-    );
-
-    return transactions;
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error("Error fetching transaction history:", error.message);
-    } else {
-      console.error("Unknown error fetching transaction history:", error);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
     }
+
+    const data = await response.json();
+    if (data.status !== "1") {
+      throw new Error(`API error: ${data.message}`);
+    }
+
+    return data.result; // List of transactions
+  } catch (error) {
+    console.error("Error fetching transaction list:", error);
     throw error;
   }
 }
@@ -99,7 +66,9 @@ const customGetTransactionsHistory = customActionProvider<WalletProvider>({
       .describe("The address to retrieve transactions history from"),
   }),
   invoke: async (walletProvider: any, args: any) => {
+    console.log("Triggered customGetTransactionHistory");
     const { address } = args;
+    console.log(`Address passed to customGetTransactionHistory: ${address}`);
     const transactions = await getWalletTransactions(address);
     // Return an object that includes the address and transactions
     return {
@@ -141,9 +110,7 @@ function validateEnvironment(): void {
 
   // Warn about optional NETWORK_ID
   if (!process.env.NETWORK_ID) {
-    console.warn(
-      "Warning: NETWORK_ID not set, defaulting to base mainnet "
-    );
+    console.warn("Warning: NETWORK_ID not set, defaulting to base mainnet ");
   }
 }
 
@@ -411,16 +378,19 @@ if (isMain) {
 export async function agentChat(prompt: string): Promise<string> {
   const { agent, config } = await initializeAgent();
   let finalResponse = "";
-  const stream = await agent.stream(
+  const stream: IterableReadableStream<any> = await agent.stream(
     { messages: [new HumanMessage(prompt)] },
     config
   );
+  console.log(`stream: ${stream}`);
   for await (const chunk of stream) {
+    console.log(`chunk: ${chunk}`);
     if ("agent" in chunk) {
       finalResponse += chunk.agent.messages[0].content;
     } else if ("tools" in chunk) {
       finalResponse += chunk.tools.messages[0].content;
     }
   }
+  console.log(`finalResponse: ${finalResponse}`);
   return finalResponse;
 }
