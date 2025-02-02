@@ -5,7 +5,8 @@ import { motion } from 'framer-motion'
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { MotionHeader } from "@/app/components/MotionHeader"
-import { Message } from '@/app/components/Chat'
+import { WalletStats } from './types/wallet'
+import { WalletStatsTable } from './components/WalletStatsTable'
 
 const CHAT_SUGGESTIONS = [
   "🔍 Analyze my wallet activity",
@@ -16,8 +17,43 @@ const CHAT_SUGGESTIONS = [
   "🤔 Explain recent transactions",
 ];
 
+function parseWalletStats(content: string): WalletStats | null {
+  try {
+    // Look for the Wallet Details section
+    const walletDetailsMatch = content.match(/Wallet Details:[\s\S]*?(?=\n\n|$)/);
+    if (!walletDetailsMatch) return null;
+
+    const walletDetails = walletDetailsMatch[0];
+    
+    // Extract individual components using regex
+    const addressMatch = walletDetails.match(/Address: (0x[a-fA-F0-9]+)/);
+    const protocolMatch = walletDetails.match(/Protocol Family: (\w+)/);
+    const networkIdMatch = walletDetails.match(/Network ID: ([^\n]+)/);
+    const chainIdMatch = walletDetails.match(/Chain ID: (\d+)/);
+    const ethBalanceMatch = walletDetails.match(/ETH Balance: ([0-9.]+)/);
+    
+    if (!addressMatch) return null;
+
+    return {
+      provider: "cdp_wallet_provider",
+      address: addressMatch[1],
+      network: {
+        protocolFamily: protocolMatch?.[1] || "evm",
+        networkId: networkIdMatch?.[1].trim() || "base-sepolia",
+        chainId: parseInt(chainIdMatch?.[1] || "84532"),
+      },
+      ethBalance: ethBalanceMatch?.[1] || "0",
+      balances: {} // Add any additional token balances if needed
+    };
+  } catch (error) {
+    console.error('Error parsing wallet stats:', error);
+    return null;
+  }
+}
+
 export default function Home() {
   const [currentResponse, setCurrentResponse] = useState<string | null>(null)
+  const [walletStats, setWalletStats] = useState<WalletStats | null>(null)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -27,6 +63,7 @@ export default function Home() {
 
     setIsLoading(true)
     setCurrentResponse(null)
+    setWalletStats(null)
 
     try {
       const response = await fetch('/api/agent/chat', {
@@ -42,7 +79,18 @@ export default function Home() {
       }
 
       const data = await response.json()
-      setCurrentResponse(data.response)
+      const responseText = data.response;
+      
+      // Try to parse wallet stats from the response
+      const stats = parseWalletStats(responseText);
+      if (stats) {
+        setWalletStats(stats);
+        // Remove the wallet details section from the displayed response
+        const cleanResponse = responseText.replace(/Wallet Details:[\s\S]*?\n\n/, '').trim();
+        setCurrentResponse(cleanResponse);
+      } else {
+        setCurrentResponse(responseText);
+      }
     } catch (error) {
       console.error('Error:', error)
       setCurrentResponse('Sorry, something went wrong.')
@@ -125,24 +173,29 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Response Container - Shows only the current response */}
+      {/* Response Container */}
       <div className="mt-[500px] w-full max-w-4xl mx-auto px-4 pb-8">
-        {(isLoading || currentResponse) && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="bg-white bg-opacity-80 backdrop-blur-md rounded-lg p-6 shadow-lg"
-          >
-            {isLoading ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
-                <p className="text-gray-600">Analyzing...</p>
-              </div>
-            ) : (
-              <p className="text-gray-700 whitespace-pre-wrap">{currentResponse}</p>
+        {(isLoading || currentResponse || walletStats) && (
+          <div className="space-y-4">
+            <WalletStatsTable stats={walletStats} />
+            {(isLoading || currentResponse) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="bg-white bg-opacity-80 backdrop-blur-md rounded-lg p-6 shadow-lg"
+              >
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
+                    <p className="text-gray-600">Analyzing...</p>
+                  </div>
+                ) : (
+                  <p className="text-gray-700 whitespace-pre-wrap">{currentResponse}</p>
+                )}
+              </motion.div>
             )}
-          </motion.div>
+          </div>
         )}
       </div>
     </div>

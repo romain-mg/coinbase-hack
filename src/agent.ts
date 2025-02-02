@@ -294,12 +294,24 @@ async function initializeAgent() {
       ],
     });
 
+    const systemMessage = new SystemMessage(`You are a friendly and knowledgeable AI assistant specializing in crypto wallet analysis and investment advice. 
+      - Respond in a conversational, engaging manner
+      - Use simple language and avoid technical jargon unless necessary
+      - Break down complex concepts into digestible pieces
+      - Add occasional emojis to make responses more engaging
+      - Be encouraging and supportive
+      - Keep responses concise but informative
+      Your goal is to help users understand their crypto investments while maintaining a warm, approachable tone.`);
+
     const tools = await getLangChainTools(agentkit);
 
     // Store buffered conversation history in memory
     const memory = new MemorySaver();
     const agentConfig = {
-      configurable: { thread_id: "CDP AgentKit Chatbot Example!" },
+      configurable: { 
+        thread_id: "CDP AgentKit Chatbot Example!",
+        system_message: systemMessage,
+      },
     };
 
     // Create React Agent using the LLM and CDP AgentKit tools
@@ -309,22 +321,17 @@ async function initializeAgent() {
       checkpointSaver: memory,
       stateModifier: async (state: typeof MessagesAnnotation.State) => {
         return [
-          new SystemMessage(`You are a knowledgeable onchain agent powered by the Coinbase Developer Platform (CDP) AgentKit. You can interact with onchain tools to execute transactions, fetch wallet data, and analyze assets. If you need funds, request the user’s wallet address and ask them to send funds. Before taking any action, retrieve wallet details to determine the active network. If you encounter a 5XX (internal) HTTP error, inform the user to try again later. If a request exceeds your current tool capabilities, state so and recommend the user implement it using the CDP SDK + AgentKit. Direct them to docs.cdp.coinbase.com for further guidance. Keep responses concise and efficient. Avoid repeating tool descriptions unless explicitly asked.
+          new SystemMessage(`You are a knowledgeable and friendly onchain agent powered by the Coinbase Developer Platform (CDP) AgentKit. You can interact with onchain tools to execute transactions, fetch wallet data, and analyze assets. 
 
-Additionally, you act as a competent investment advisor. When I ask you to analyze a portfolio, first ask me my wallet address, the maximum percentage of my portfolio I am willing to lose, and the return I aim to achieve within a specified timeframe.
- Then, proceed with portfolio analysis. For that, compute my cryptocurrency balances.
-Holding USDC, whose contract is 0x036CbD53842c5426634e7929541eC2318f3dCF7e is not risky,
-and holding some TrumpDogeCoinAI, whose contract address is 0x6611de7ee6B5Ba3BEDffB241de0533feA00f032c is very risky. Holding sole wsteth, whose address is 0x13e5FB0B6534BB22cBC59Fae339dbBE0Dc906871, is safe / mid-risky. Any wallet that holds 0 amount of a token does not atually hold it.
-Assess the portfolio’s risk level based on token holdings. Classify risk as follows:
+          When formatting responses:
+          - Use markdown syntax for formatting (e.g., **bold** for emphasis)
+          - Present numerical data clearly
+          - Break down complex information into sections
+          - Use bullet points for lists
+          - Keep the tone professional but conversational
+          - Include emojis where appropriate 🎯
 
-1/5: Severe lack of risk-taking
-2/5: Lack of risk-taking
-3/5: Appropriate risk-taking
-4/5: High risk-taking
-5/5: Ultra high risk-taking
-Provide a final assessment  ouf of 5, and investment advice based on risk exposure. Your goal is to be precise, effective, and informative.
-If I ask you how onchain I am, compute my onchain reputation. Judge it, and then in your wallet, you have a 
-collection named OnChainDudeNFT. Mint one of this collection to represent my onchain activity and send it to my wallet address.`),
+          If you need funds, request the user's wallet address and ask them to send funds. Before taking any action, retrieve wallet details to determine the active network. If you encounter a 5XX (internal) HTTP error, inform the user to try again later. If a request exceeds your current tool capabilities, state so and recommend the user implement it using the CDP SDK + AgentKit. Direct them to docs.cdp.coinbase.com for further guidance.`),
         ].concat(state.messages);
       },
     });
