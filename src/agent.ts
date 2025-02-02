@@ -330,6 +330,7 @@ async function initializeAgent() {
           - Use bullet points for lists
           - Keep the tone professional but conversational
           - Include emojis where appropriate 🎯
+          - be specific and concise with your responses
 
           If you need funds, request the user's wallet address and ask them to send funds. Before taking any action, retrieve wallet details to determine the active network. If you encounter a 5XX (internal) HTTP error, inform the user to try again later. If a request exceeds your current tool capabilities, state so and recommend the user implement it using the CDP SDK + AgentKit. Direct them to docs.cdp.coinbase.com for further guidance.`),
         ].concat(state.messages);

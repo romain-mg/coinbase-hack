@@ -55,6 +55,7 @@ export default function Home() {
   const [walletStats, setWalletStats] = useState<WalletStats | null>(null)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const hasInteracted = currentResponse !== null || isLoading
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,19 +101,27 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-100 to-purple-100">
-      <div className="fixed top-0 left-0 right-0 bg-gradient-to-br from-blue-100 to-purple-100 pt-20 pb-8">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0052FF]/20 via-[#0052FF]/10 to-white">
+      <div className={`transition-all duration-500 ease-in-out ${hasInteracted ? 'pt-20' : 'pt-[30vh]'}`}>
         <div className="max-w-3xl mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: -30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="text-sm text-blue-400 bg-blue-200 rounded-full px-4 py-1 font-medium mb-2 w-fit mx-auto"
+            className="text-sm text-blue-600 bg-white/80 backdrop-blur-sm rounded-full px-4 py-1.5 font-medium mb-2 w-fit mx-auto"
           >
-            AI POWERED
+            beta
           </motion.div>
           
-          <MotionHeader />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mb-8"
+          >
+            <h1 className="text-4xl font-bold mb-4 text-gray-800">Insights.ai wallet analyzer</h1>
+            <p className="text-gray-600 font-medium">
+              Get investment advice and measure your onchain activity.
+            </p>
+          </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -126,15 +135,16 @@ export default function Home() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e)}
-                className="w-full text-2xl p-6 rounded-full shadow-lg focus:ring-0 
-                  transition-all duration-300 bg-white bg-opacity-80 
-                  backdrop-blur-md pr-16"
+                className={`w-full transition-all duration-500 ease-in-out
+                  ${hasInteracted ? 'text-xl p-4' : 'text-2xl p-6'} 
+                  rounded-full shadow-lg focus:ring-0 
+                  bg-white bg-opacity-80 backdrop-blur-md pr-16`}
                 disabled={isLoading}
               />
               <Button
                 type="submit"
-                onClick={(e) => handleSubmit(e)}
-                className="absolute right-2 top-2 rounded-full 
+                onClick={handleSubmit}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full 
                   bg-blue-500 hover:bg-blue-600 transition-colors duration-300"
                 disabled={isLoading}
               >
@@ -159,22 +169,37 @@ export default function Home() {
                     setInput(suggestion)
                     handleSubmit({ preventDefault: () => {} } as React.FormEvent)
                   }}
-                  className="px-4 py-2 text-sm bg-white/50 hover:bg-white/80 
+                  className={`px-4 py-2 text-sm bg-white/50 hover:bg-white/80 
                     text-gray-600 rounded-full transition-all duration-200 
                     backdrop-blur-sm border border-gray-200/50 
-                    hover:border-gray-300/50 hover:shadow-sm"
+                    hover:border-gray-300/50 hover:shadow-sm
+                    ${hasInteracted ? 'text-sm' : 'text-base'}`}
                 >
                   {suggestion}
                 </motion.button>
               ))}
             </div>
           </motion.div>
+
+          {/* Loading Animation */}
+          {isLoading && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center justify-center mt-6 space-x-3"
+            >
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce" />
+            </motion.div>
+          )}
         </div>
       </div>
 
       {/* Response Container */}
-      <div className="mt-[500px] w-full max-w-4xl mx-auto px-4 pb-8">
-        {(isLoading || currentResponse || walletStats) && (
+      <div className={`w-full max-w-4xl mx-auto px-4 pb-8 transition-all duration-500 ease-in-out
+        ${hasInteracted ? 'mt-8' : 'mt-16'}`}>
+        {(currentResponse || walletStats) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Wallet Stats Column */}
             <div>
@@ -182,21 +207,23 @@ export default function Home() {
             </div>
             
             {/* Response Column */}
-            {(isLoading || currentResponse) && (
+            {currentResponse && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
-                className="bg-white bg-opacity-80 backdrop-blur-md rounded-lg p-6 shadow-lg h-fit"
+                className="bg-white bg-opacity-80 backdrop-blur-md rounded-lg p-8 shadow-lg h-fit"
               >
-                {isLoading ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
-                    <p className="text-gray-600">Analyzing...</p>
-                  </div>
-                ) : (
-                  <p className="text-gray-700 whitespace-pre-wrap">{currentResponse}</p>
-                )}
+                <div className="text-gray-700 whitespace-pre-wrap text-lg leading-relaxed">
+                  {currentResponse?.split(/(\*\*.*?\*\*|###.*?)/).map((part, index) => {
+                    if (part.startsWith('**') && part.endsWith('**')) {
+                      return <strong key={index} className="text-xl">{part.slice(2, -2)}</strong>;
+                    } else if (part.startsWith('###')) {
+                      return <h3 key={index} className="text-2xl font-bold mt-8 mb-4">{part.slice(3).trim()}</h3>;
+                    }
+                    return <span key={index}>{part}</span>;
+                  })}
+                </div>
               </motion.div>
             )}
           </div>
